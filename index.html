@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+  <title>Chatly - Private Messenger</title>
+
+  <!-- Firebase Compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
+
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+      --primary-hover: #4f46e5;
+      --bg-main: #090e17;
+      --bg-surface: #111827;
+      --bg-subtle: #1e293b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --bubble-mine: linear-gradient(135deg, #4f46e5, #7c3aed);
+      --bubble-peer: #1e293b;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      height: 100dvh;
+    }
+
+    #CHATLY_APP {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100dvh;
+      background: var(--bg-main);
+      display: flex;
+      overflow: hidden;
+    }
+    #CHATLY_APP button, #CHATLY_APP input, #CHATLY_APP textarea, #CHATLY_APP select {
+      font-family: inherit;
+    }
+    #CHATLY_APP button { cursor: pointer; border: 0; outline: none; }
+    .ch-hidden { display: none !important; }
+
+    /* AUTH SCREEN */
+    .ch-auth-wrapper {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #090e17 70%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .ch-auth-card {
+      width: min(440px, 100%);
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      border-radius: 28px;
+      padding: 36px 32px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .ch-logo-badge {
+      width: 68px;
+      height: 68px;
+      border-radius: 20px;
+      background: var(--primary-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+      margin-bottom: 20px;
+    }
+    .ch-auth-card h1 { margin-bottom: 8px; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    .ch-auth-card p { margin-bottom: 24px; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+    .ch-form { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .ch-input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.8);
+      color: #fff;
+      outline: none;
+      font-size: 15px;
+      transition: all 0.2s;
+    }
+    .ch-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+    .ch-btn-primary {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--primary-gradient);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      transition: opacity 0.2s, transform 0.1s;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+    }
+    .ch-btn-primary:active { transform: scale(0.98); }
+    .ch-btn-secondary {
+      width: 100%;
+      padding: 13px;
+      border-radius: 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .ch-auth-status { min-height: 20px; font-size: 13px; color: #a5b4fc; text-align: center; }
+
+    /* APP SHELL */
+    .ch-shell {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      position: relative;
+      background: var(--bg-main);
+    }
+
+    /* SIDEBAR */
+    .ch-sidebar {
+      width: 380px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
+    }
+    .ch-side-header {
+      height: 70px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .ch-brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .ch-side-icons { display: flex; gap: 8px; }
+    .ch-icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--bg-subtle);
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+    .ch-icon-btn:hover { background: rgba(99, 102, 241, 0.2); color: #fff; }
+
+    /* STORIES BAR */
+    .ch-stories-bar {
+      padding: 14px 18px;
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      scrollbar-width: none;
+      align-items: center;
+    }
+    .ch-stories-bar::-webkit-scrollbar { display: none; }
+    .ch-story-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .ch-story-ring {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      padding: 2.5px;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .ch-story-ring.has-story { background: var(--primary-gradient); }
+    .ch-story-avatar {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #1e293b;
+      border: 2px solid var(--bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+    }
+    .ch-story-name { font-size: 11px; color: var(--text-muted); max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* FILTERS & SEARCH */
+    .ch-filter-area { padding: 12px 18px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border); }
+    .ch-search-box { position: relative; width: 100%; }
+    .ch-search-box input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      border-radius: 12px;
+      background: var(--bg-subtle);
+      border: 1px solid transparent;
+      color: #fff;
+      outline: none;
+      font-size: 14px;
+    }
+    .ch-search-box input:focus { border-color: var(--primary); }
+    .ch-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+    .ch-pill-group { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+    .ch-pill-group::-webkit-scrollbar { display: none; }
+    .ch-pill {
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ch-pill.active { background: var(--primary); color: #fff; }
+
+    /* LIST VIEWS */
+    .ch-tab-view { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .ch-chat-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .ch-chat-item:hover, .ch-chat-item.active { background: rgba(99, 102, 241, 0.1); }
+    .ch-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: #312e81;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #c7d2fe;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .ch-avatar-dot {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-surface);
+      background: var(--text-muted);
+    }
+    .ch-avatar-dot.online { background: var(--success); }
+    .ch-chat-info { flex: 1; min-width: 0; }
+    .ch-chat-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .ch-chat-name { font-size: 15px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ch-chat-time { font-size: 11px; color: var(--text-muted); }
+    .ch-chat-time.online-badge { color: var(--success); font-weight: 600; }
+    .ch-chat-lastmsg { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* BOTTOM NAV */
+    .ch-bottom-bar {
+      height: 64px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 0 10px;
+    }
+    .ch-nav-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      background: transparent;
+      padding: 6px 12px;
+      border-radius: 12px;
+    }
+    .ch-nav-tab.active { color: var(--primary); }
+
+    /* MAIN CHAT CANVAS */
+    .ch-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-main);
+      position: relative;
+    }
+    .ch-chat-header {
+      height: 70px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .ch-peer-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .ch-back-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--bg-subtle);
+      color: #fff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .ch-peer-name { font-size: 16px; font-weight: 700; color: #fff; }
+    .ch-peer-status { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+    .ch-peer-status.online { color: var(--success); font-weight: 600; }
+    .ch-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+    .ch-status-dot.online { background: var(--success); }
+
+    /* MESSAGES FEED & MODERN BUBBLES */
+    .ch-messages-box {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      background: radial-gradient(circle at 50% 0, #131b2e 0%, #090e17 60%);
+    }
+    .ch-empty-state { margin: auto; text-align: center; max-width: 320px; color: var(--text-muted); }
+    .ch-empty-state h3 { color: #fff; margin-bottom: 6px; }
+
+    .ch-msg-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      max-width: min(85%, 580px);
+      align-self: flex-start;
+      position: relative;
+    }
+    .ch-msg-wrapper.mine {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .ch-bubble {
+      padding: 12px 16px;
+      border-radius: 20px;
+      background: var(--bubble-peer);
+      color: #fff;
+      font-size: 14.5px;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .ch-msg-wrapper.mine .ch-bubble {
+      background: var(--bubble-mine);
+      border-bottom-right-radius: 4px;
+    }
+    .ch-msg-wrapper:not(.mine) .ch-bubble {
+      border-bottom-left-radius: 4px;
+    }
+    .ch-bubble-meta {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 5px;
+      margin-top: 5px;
+    }
+    .ch-bubble-time { font-size: 10.5px; color: rgba(255, 255, 255, 0.7); }
+    .ch-tick { font-size: 13px; color: rgba(255, 255, 255, 0.6); font-weight: bold; }
+    .ch-tick.seen { color: #38bdf8; }
+    .ch-msg-del-btn {
+      opacity: 0;
+      color: var(--text-muted);
+      background: transparent;
+      padding: 4px;
+      font-size: 14px;
+    }
+    .ch-msg-wrapper:hover .ch-msg-del-btn { opacity: 1; }
+    .ch-msg-del-btn:hover { color: var(--danger); }
+
+    .ch-audio-player audio { width: 230px; height: 38px; outline: none; border-radius: 8px; }
+    .ch-file-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px 14px;
+      border-radius: 12px;
+      margin-bottom: 6px;
+    }
+    .ch-file-badge .name { font-weight: 600; font-size: 13px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ch-file-badge .size { font-size: 11px; color: #a5b4fc; }
+    .ch-file-badge .dl-btn {
+      background: #fff;
+      color: var(--primary);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .ch-img-preview { max-width: 100%; max-height: 280px; border-radius: 12px; margin-bottom: 6px; display: block; }
+
+    /* COMPOSER */
+    .ch-composer-bar {
+      padding: 12px 18px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      position: relative;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    .ch-composer-input {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 16px;
+      border-radius: 24px;
+      background: var(--bg-subtle);
+      border: 1px solid transparent;
+      color: #fff;
+      font-size: 15px;
+      line-height: 1.4;
+      resize: none;
+      overflow-y: hidden;
+      height: 46px;
+      min-height: 46px;
+      max-height: 140px;
+      outline: none;
+    }
+    .ch-composer-input:focus { border-color: var(--border-active); }
+    .ch-action-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .ch-send-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--primary-gradient);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 19px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+    .ch-mic-btn.recording { background: var(--danger) !important; animation: chPulse 1.2s infinite; }
+    @keyframes chPulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+    /* ATTACHMENT SHEET */
+    .ch-attachment-sheet {
+      position: absolute;
+      bottom: 80px;
+      left: 20px;
+      right: 20px;
+      max-width: 400px;
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      z-index: 20;
+    }
+    .ch-attach-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      background: transparent;
+    }
+    .ch-attach-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #fff;
+    }
+    .ch-attach-option span.label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+    /* RECORDING BAR */
+    .ch-rec-bar {
+      flex: 1;
+      height: 46px;
+      border-radius: 24px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+    .ch-rec-timer { font-size: 13px; font-weight: 700; color: #f87171; display: flex; align-items: center; gap: 8px; }
+    .ch-rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+
+    /* PROGRESS BOX */
+    .ch-progress-container {
+      padding: 10px 18px;
+      background: rgba(17, 24, 39, 0.95);
+      border-top: 1px solid var(--border);
+    }
+
+    /* IMMERSIVE CALL & CAMERA FLIP SYSTEM */
+    .ch-call-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #000;
+      display: flex;
+    }
+    .ch-call-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    #PM_REMOTE_VIDEO { width: 100%; height: 100%; object-fit: cover; background:#111; }
+    
+    #PM_LOCAL_VIDEO {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: min(180px, 30vw);
+      aspect-ratio: 9/16;
+      max-height: 240px;
+      object-fit: cover;
+      border-radius: 18px;
+      border: 2px solid var(--primary);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8);
+      background: #111;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      z-index: 110;
+      transform: scaleX(-1);
+      transition: opacity 0.2s ease;
+    }
+    #PM_LOCAL_VIDEO.environment-mode {
+      transform: scaleX(1) !important;
+    }
+    #PM_LOCAL_VIDEO.self-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .ch-call-header {
+      position: absolute;
+      top: 24px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+      border-radius: 16px;
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(10px);
+      z-index: 120;
+    }
+    .ch-call-controls {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 14px;
+      padding: 12px 24px;
+      border-radius: 40px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(15px);
+      z-index: 120;
+    }
+    .ch-call-controls button {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--bg-subtle);
+      color: #fff;
+      font-size: 19px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .ch-call-controls button.disabled-btn { background: var(--danger) !important; color: #fff; }
+    .ch-call-controls button.hangup { background: var(--danger); }
+
+    /* STORY VIEWER */
+    .ch-story-viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 150;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .ch-story-viewer img, .ch-story-viewer video {
+      max-width: 100%;
+      max-height: 80vh;
+      border-radius: 16px;
+      object-fit: contain;
+    }
+    .ch-story-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 22px;
+    }
+
+    .ch-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      padding: 12px 20px;
+      border-radius: 14px;
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      font-size: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    @media (max-width: 768px) {
+      .ch-sidebar { width: 100%; }
+      .ch-main { display: none; }
+      .ch-shell.chat-open .ch-sidebar { display: none; }
+      .ch-shell.chat-open .ch-main { display: flex; }
+      .ch-back-btn { display: flex; }
+      #PM_LOCAL_VIDEO { width: 110px; height: 160px; bottom: 90px; right: 15px; }
+      .ch-call-controls { gap: 10px; padding: 10px 18px; }
+      .ch-call-controls button { width: 44px; height: 44px; font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="CHATLY_APP">
+    <!-- AUTH SCREEN -->
+    <div class="ch-auth-wrapper" id="CH_AUTH_VIEW">
+      <div class="ch-auth-card">
+        <div class="ch-logo-badge">💬</div>
+        <h1 id="CH_AUTH_HEADING">Welcome to Chatly</h1>
+        <p id="CH_AUTH_SUBTITLE">Chat • Call • Share • Connect with End-to-End Privacy.</p>
+
+        <div class="ch-form">
+          <input autocomplete="name" class="ch-input" id="CH_INPUT_NAME" placeholder="Full Name" type="text"/>
+          <input autocomplete="username" class="ch-input" id="CH_INPUT_USERNAME" placeholder="Choose Username (e.g. @dinesh355)" type="text"/>
+          <input autocomplete="email" class="ch-input" id="CH_INPUT_EMAIL" placeholder="Email address" type="email"/>
+          <input autocomplete="new-password" class="ch-input" id="CH_INPUT_PASSWORD" placeholder="Password (min 6 characters)" type="password"/>
+
+          <button class="ch-btn-primary" id="CH_SUBMIT_AUTH" type="button">Get Started</button>
+          <button class="ch-btn-secondary" id="CH_TOGGLE_AUTH" type="button">Already have an account? Login</button>
+
+          <div class="ch-auth-status" id="CH_AUTH_STATUS"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN CHATLY INTERFACE -->
+    <div class="ch-shell ch-hidden" id="CH_APP_SHELL">
+      <!-- SIDEBAR -->
+      <aside class="ch-sidebar">
+        <div class="ch-side-header">
+          <div class="ch-brand-title" id="CH_SIDE_TITLE">Chatly</div>
+          <div class="ch-side-icons">
+            <button class="ch-icon-btn" id="CH_ADD_CONTACT_BTN" title="Add Contact" type="button">➕</button>
+            <button class="ch-icon-btn" id="CH_PROFILE_TRIGGER" title="Settings" type="button">⚙️</button>
+          </div>
+        </div>
+
+        <!-- STORIES CONTAINER -->
+        <div class="ch-stories-bar" id="CH_STORIES_CONTAINER">
+          <div class="ch-story-item" id="CH_MY_STORY_TRIGGER">
+            <div class="ch-story-ring" id="CH_MY_STORY_RING"><div class="ch-story-avatar">+</div></div>
+            <span class="ch-story-name">My Story</span>
+          </div>
+        </div>
+
+        <input accept="image/*,video/*" id="CH_STORY_INPUT" style="display:none;" type="file"/>
+
+        <!-- SEARCH & PILLS -->
+        <div class="ch-filter-area">
+          <div class="ch-search-box">
+            <span class="ch-search-icon">🔍</span>
+            <input autocomplete="off" id="CH_SEARCH_INPUT" placeholder="Search..." type="text"/>
+          </div>
+          <div class="ch-pill-group">
+            <div class="ch-pill active" data-filter="all">All</div>
+            <div class="ch-pill" data-filter="unread">Unread</div>
+            <div class="ch-pill" data-filter="groups">Groups</div>
+            <div class="ch-pill" data-filter="calls">Calls</div>
+          </div>
+        </div>
+
+        <!-- TAB VIEWS CONTAINER -->
+        <div class="ch-tab-view" id="CH_VIEW_CHATS">
+          <div class="ch-chat-list" id="CH_CONVERSATIONS_LIST"></div>
+        </div>
+
+        <div class="ch-tab-view ch-hidden" id="CH_VIEW_CALLS">
+          <div class="ch-chat-list" id="CH_CALLS_LIST">
+            <div style="padding:30px 20px; text-align:center; color:var(--text-muted); font-size:14px;">
+              <div style="font-size:32px; margin-bottom:10px;">📞</div>
+              No call history yet.<br/>Start a voice or video call with your contacts.
+            </div>
+          </div>
+        </div>
+
+        <div class="ch-tab-view ch-hidden" id="CH_VIEW_PEOPLE">
+          <div style="padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+            <strong style="font-size:14px;">All Contacts</strong>
+            <button id="CH_ADD_PEOPLE_TRIGGER" style="color:var(--primary); background:transparent; font-size:13px; font-weight:700;" type="button">+ Add New</button>
+          </div>
+          <div class="ch-chat-list" id="CH_PEOPLE_LIST"></div>
+        </div>
+
+        <!-- BOTTOM TABS -->
+        <div class="ch-bottom-bar">
+          <button class="ch-nav-tab active" id="CH_TAB_CHATS" type="button"><span class="icon">💬</span><span>Chats</span></button>
+          <button class="ch-nav-tab" id="CH_TAB_CALLS" type="button"><span class="icon">📞</span><span>Calls</span></button>
+          <button class="ch-nav-tab" id="CH_TAB_PEOPLE" type="button"><span class="icon">👥</span><span>People</span></button>
+          <button class="ch-nav-tab" id="CH_TAB_SETTINGS" type="button"><span class="icon">⚙️</span><span>Settings</span></button>
+        </div>
+      </aside>
+
+      <!-- MAIN CHAT CANVAS -->
+      <main class="ch-main">
+        <header class="ch-chat-header">
+          <div class="ch-peer-info">
+            <button class="ch-back-btn" id="CH_CHAT_BACK" type="button">←</button>
+            <div class="ch-avatar" id="CH_ACTIVE_AVATAR">?</div>
+            <div>
+              <div class="ch-peer-name" id="CH_ACTIVE_NAME">Select a Conversation</div>
+              <div class="ch-peer-status" id="CH_ACTIVE_STATUS"><span class="ch-status-dot"></span><span id="CH_STATUS_LABEL">Offline</span></div>
+            </div>
+          </div>
+          <div class="ch-side-icons">
+            <button class="ch-icon-btn" id="CH_CALL_VOICE" title="Voice Call" type="button">📞</button>
+            <button class="ch-icon-btn" id="CH_CALL_VIDEO" title="Video Call" type="button">📹</button>
+          </div>
+        </header>
+
+        <section class="ch-messages-box" id="CH_MESSAGES_FEED">
+          <div class="ch-empty-state">
+            <h3>No conversation selected</h3>
+            <p>Select a contact or add someone by their @username to begin end-to-end encrypted messaging.</p>
+          </div>
+        </section>
+
+        <!-- PROGRESS BOX FOR LARGE UPLOADS -->
+        <div class="ch-progress-container ch-hidden" id="PM_PROGRESS_BOX">
+          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+            <span id="PM_PROGRESS_TEXT">Uploading...</span>
+            <span id="PM_PROGRESS_PERCENT">0%</span>
+          </div>
+          <div style="width:100%; height:5px; background:var(--bg-subtle); border-radius:3px; overflow:hidden;">
+            <div id="PM_PROGRESS_FILL" style="width:0%; height:100%; background:var(--primary); transition:width 0.2s;"></div>
+          </div>
+        </div>
+
+        <!-- ATTACHMENT MENU -->
+        <div class="ch-attachment-sheet ch-hidden" id="CH_ATTACHMENT_MENU">
+          <button class="ch-attach-option" id="CH_ACTION_DOC" type="button">
+            <div class="ch-attach-icon" style="background:#3b82f6;">📄</div>
+            <span class="label">Document</span>
+          </button>
+          <button class="ch-attach-option" id="CH_ACTION_GALLERY" type="button">
+            <div class="ch-attach-icon" style="background:#8b5cf6;">🖼️</div>
+            <span class="label">Gallery</span>
+          </button>
+          <button class="ch-attach-option" id="CH_ACTION_AUDIO" type="button">
+            <div class="ch-attach-icon" style="background:#ec4899;">🎵</div>
+            <span class="label">Audio</span>
+          </button>
+          <button class="ch-attach-option" id="CH_ACTION_LOCATION" type="button">
+            <div class="ch-attach-icon" style="background:#10b981;">📍</div>
+            <span class="label">Location</span>
+          </button>
+          <button class="ch-attach-option" id="CH_ACTION_POLL" type="button">
+            <div class="ch-attach-icon" style="background:#06b6d4;">📊</div>
+            <span class="label">Poll</span>
+          </button>
+          <button class="ch-attach-option" id="CH_ACTION_CONTACT" type="button">
+            <div class="ch-attach-icon" style="background:#f59e0b;">👤</div>
+            <span class="label">Contact</span>
+          </button>
+        </div>
+
+        <!-- COMPOSER -->
+        <footer class="ch-composer-bar">
+          <textarea autocomplete="off" class="ch-composer-input" id="PM_MESSAGE" placeholder="Type a message..." rows="1"></textarea>
+
+          <div class="ch-rec-bar ch-hidden" id="PM_REC_BAR">
+            <div class="ch-rec-timer">
+              <div class="ch-rec-dot"></div>
+              <span id="PM_REC_TIMER">00:00</span>
+            </div>
+            <button class="ch-icon-btn" id="PM_CANCEL_REC" style="width:32px; height:32px; color:#f87171;" title="Cancel" type="button">✕</button>
+          </div>
+
+          <input id="PM_FILE_INPUT" style="display:none;" type="file"/>
+          <button class="ch-action-btn" id="CH_ATTACH_TRIGGER" title="Share" type="button">📎</button>
+          <button class="ch-action-btn ch-mic-btn" id="PM_MIC_BTN" title="Voice Note" type="button">🎙️</button>
+          <button class="ch-send-btn" id="PM_SEND" title="Send" type="button">➔</button>
+        </footer>
+      </main>
+    </div>
+
+    <!-- CALL SCREEN WITH CAMERA FLIP & EXTENDED CONTROLS -->
+    <div class="ch-call-overlay ch-hidden" id="PM_CALL">
+      <div class="ch-call-container">
+        <div class="ch-call-header">
+          <strong id="PM_CALL_TITLE">Call in Progress</strong>
+          <span id="PM_CALL_STATUS" style="color:#a5b4fc; font-size:13px;">Connecting...</span>
+        </div>
+        <video autoplay id="PM_REMOTE_VIDEO" playsinline></video>
+        <video autoplay id="PM_LOCAL_VIDEO" muted playsinline title="Drag to move / Double-click to hide"></video>
+        
+        <div class="ch-call-controls">
+          <button id="PM_MUTE" title="Mute/Unmute Mic" type="button">🎙️</button>
+          <button id="PM_CAMERA" title="Camera On/Off" type="button">📷</button>
+          <button id="PM_FLIP_CAMERA" title="Flip Front/Back Camera" type="button">🔄</button>
+          <button id="PM_TOGGLE_PIP" title="Hide/Show Self View" type="button">🔲</button>
+          <button class="hangup" id="PM_END_CALL" title="End Call" type="button">📞</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORY VIEWER -->
+    <div class="ch-story-viewer ch-hidden" id="CH_STORY_VIEWER">
+      <button class="ch-story-close" id="CH_CLOSE_STORY" type="button">✕</button>
+      <div id="CH_STORY_CONTENT"></div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="ch-auth-wrapper ch-hidden" id="CH_SETTINGS_MODAL">
+      <div class="ch-auth-card" style="max-width:400px;">
+        <h2>Settings &amp; Profile</h2>
+        <div class="ch-form">
+          <input class="ch-input" id="CH_SETTINGS_NAME" placeholder="Display Name" type="text"/>
+          <input class="ch-input" disabled id="CH_SETTINGS_USERNAME" style="opacity:0.6;" type="text"/>
+          
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0;">
+            <span style="font-size:14px;">Desktop Notifications</span>
+            <input id="CH_SETTINGS_NOTIF" style="width:20px; height:20px;" type="checkbox"/>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0;">
+            <span style="font-size:14px;">Message Ringtone</span>
+            <select class="ch-input" id="CH_SETTINGS_MSG_TONE" style="width: 150px; padding: 8px 10px;">
+              <option value="default">Chime (Default)</option>
+              <option value="pop">Pop Bubble</option>
+              <option value="bell">Bell Ding</option>
+              <option value="none">Mute</option>
+            </select>
+          </div>
+
+          <button class="ch-btn-primary" id="CH_SAVE_SETTINGS_BTN" type="button">Save Changes</button>
+          <button class="ch-btn-secondary" id="CH_LOGOUT_BTN" style="color:#f87171;" type="button">Logout</button>
+          <button class="ch-btn-secondary" id="CH_CLOSE_SETTINGS_BTN" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-toast ch-hidden" id="PM_TOAST"></div>
+  </div>
+
+  <script>
+  (function(){
+    "use strict";
+
+    var firebaseConfig = {
+      apiKey: "AIzaSyBf8KicxYL7GosG7mJbWWJK4EHz4_EGY4k",
+      authDomain: "private-messenger-59ca6.firebaseapp.com",
+      projectId: "private-messenger-59ca6",
+      storageBucket: "private-messenger-59ca6.firebasestorage.app",
+      messagingSenderId: "693041584805",
+      appId: "1:693041584805:web:90eb664bec261f4f7f8b4c"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    var auth = firebase.auth();
+    var db = firebase.firestore();
+    var storage = firebase.storage();
+
+    var callRingtone = new Audio("https://actions.google.com/sounds/v1/telephones/telephone_ring.ogg");
+    callRingtone.loop = true;
+
+    var messageToneMap = {
+      default: "https://actions.google.com/sounds/v1/notifications/beams_up.ogg",
+      pop: "https://actions.google.com/sounds/v1/cartoon/pop.ogg",
+      bell: "https://actions.google.com/sounds/v1/ambiences/bell_tower_toll.ogg"
+    };
+
+    function playMessageRingtone() {
+      var selected = localStorage.getItem("PM_MSG_TONE") || "default";
+      if (selected === "none") return;
+      var url = messageToneMap[selected] || messageToneMap.default;
+      var snd = new Audio(url);
+      snd.play().catch(function(){});
+    }
+
+    function stopCallRingtone() {
+      try {
+        callRingtone.pause();
+        callRingtone.currentTime = 0;
+      } catch(e) {}
+    }
+
+    var currentUser = null;
+    var myProfile = null;
+    var selectedUser = null;
+    var messageUnsubscribe = null;
+    var contactUnsubscribe = null;
+    var incomingCallUnsubscribe = null;
+    var globalMsgUnsubscribe = null;
+    var peerPresenceUnsubscribe = null;
+    var localStream = null;
+    var peerConnection = null;
+    var currentCallId = null;
+    var callIsVideo = false;
+    var currentFacingMode = "user"; // 'user' or 'environment'
+    var pendingProfile = null;
+    var isSending = false;
+    var candidateQueue = [];
+
+    var isAudioMuted = false;
+    var isVideoMuted = false;
+
+    var mediaRecorder = null;
+    var audioStream = null;
+    var audioChunks = [];
+    var isRecording = false;
+    var recTimerInterval = null;
+    var recSeconds = 0;
+    var cancelRecording = false;
+    var isSignUpMode = true;
+
+    function $(id) { return document.getElementById(id); }
+
+    var toastTimer = null;
+    function toast(message) {
+      var box = $("PM_TOAST");
+      if (!box) return;
+      box.textContent = message;
+      box.classList.remove("ch-hidden");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function(){ box.classList.add("ch-hidden"); }, 3500);
+    }
+
+    function escapeHTML(text) {
+      return String(text).replace(/[&<>"']/g, function(m) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m];
+      });
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return "0 B";
+      var k = 1024;
+      var sizes = ["B", "KB", "MB", "GB", "TB"];
+      var i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    }
+
+    function formatLastSeen(data) {
+      if (!data) return "Offline";
+      if (data.online === true) return "Online";
+      if (!data.lastSeen) return "Offline";
+
+      var date = data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
+      var now = new Date();
+      var diffMs = now - date;
+      var diffMin = Math.floor(diffMs / (1000 * 60));
+      var diffHr = Math.floor(diffMs / (1000 * 60 * 60));
+
+      if (diffMin < 1) return "Last seen just now";
+      if (diffMin < 60) return "Last seen " + diffMin + "m ago";
+      if (diffHr < 24 && date.getDate() === now.getDate()) {
+        return "Last seen today at " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return "Last seen " + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    function chatRoomId(uid1, uid2) { return [uid1, uid2].sort().join("_"); }
+
+    function generateUserId() {
+      var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      var result = "PM-";
+      for (var i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+      return result;
+    }
+
+    function setUserOnlineStatus(isOnline) {
+      if (!currentUser) return;
+      db.collection("users").doc(currentUser.uid).update({
+        online: isOnline,
+        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function(){});
+    }
+
+    window.addEventListener("focus", function() { setUserOnlineStatus(true); });
+    window.addEventListener("blur", function() { setUserOnlineStatus(false); });
+    document.addEventListener("visibilitychange", function() {
+      setUserOnlineStatus(document.visibilityState === "visible");
+    });
+
+    var messageBox = $("PM_MESSAGE");
+    function adjustTextareaHeight() {
+      messageBox.style.height = "auto";
+      var newHeight = messageBox.scrollHeight;
+      if (newHeight > 140) {
+        messageBox.style.height = "140px";
+        messageBox.style.overflowY = "auto";
+      } else {
+        messageBox.style.height = Math.max(newHeight, 46) + "px";
+        messageBox.style.overflowY = "hidden";
+      }
+    }
+    function resetTextareaHeight() {
+      messageBox.style.height = "46px";
+      messageBox.style.overflowY = "hidden";
+    }
+    messageBox.addEventListener("input", adjustTextareaHeight);
+
+    var notificationsEnabled = localStorage.getItem("PM_NOTIF_PREF") !== "false";
+    function requestNotificationPermission() {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+
+    function showPushNotification(title, body, tag, isCall) {
+      if (!notificationsEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
+      try {
+        var options = {
+          body: body,
+          icon: "https://cdn-icons-png.flaticon.com/512/3064/3064197.png",
+          tag: tag || "chatly-notif",
+          renotify: true
+        };
+        if (isCall) options.requireInteraction = true;
+        new Notification(title, options);
+      } catch(e) {}
+    }
+
+    /* DRAGGABLE SELF VIEW WITH FLIP MIRROR FIX */
+    (function initDraggableSelfView() {
+      var pip = $("PM_LOCAL_VIDEO");
+      if (!pip) return;
+
+      var isDragging = false;
+      var currentX = 0, currentY = 0;
+      var initialX = 0, initialY = 0;
+      var xOffset = 0, yOffset = 0;
+
+      function dragStart(e) {
+        if (pip.classList.contains("self-hidden")) return;
+        var clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
+        var clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+        initialX = clientX - xOffset;
+        initialY = clientY - yOffset;
+        isDragging = true;
+      }
+
+      function dragEnd() {
+        initialX = currentX;
+        initialY = currentY;
+        isDragging = false;
+      }
+
+      function drag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        var clientX = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
+        var clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+        currentX = clientX - initialX;
+        currentY = clientY - initialY;
+        xOffset = currentX;
+        yOffset = currentY;
+
+        var scale = currentFacingMode === "user" ? "scaleX(-1)" : "scaleX(1)";
+        pip.style.transform = "translate3d(" + currentX + "px, " + currentY + "px, 0) " + scale;
+      }
+
+      pip.addEventListener("mousedown", dragStart);
+      window.addEventListener("mouseup", dragEnd);
+      window.addEventListener("mousemove", drag);
+
+      pip.addEventListener("touchstart", dragStart, { passive: false });
+      window.addEventListener("touchend", dragEnd);
+      window.addEventListener("touchmove", drag, { passive: false });
+
+      pip.addEventListener("dblclick", toggleSelfView);
+
+      window.resetSelfView = function() {
+        currentX = 0; currentY = 0;
+        initialX = 0; initialY = 0;
+        xOffset = 0; yOffset = 0;
+        pip.style.transform = currentFacingMode === "user" ? "scaleX(-1)" : "scaleX(1)";
+        pip.classList.remove("self-hidden");
+      };
+    })();
+
+    function toggleSelfView() {
+      var pip = $("PM_LOCAL_VIDEO");
+      var btn = $("PM_TOGGLE_PIP");
+      if (!pip) return;
+      var isHidden = pip.classList.toggle("self-hidden");
+      if (btn) btn.innerHTML = isHidden ? "🔳" : "🔲";
+      toast(isHidden ? "Self-view hidden" : "Self-view visible");
+    }
+
+    $("PM_TOGGLE_PIP").onclick = toggleSelfView;
+
+    /* CRYPTO UTILITIES */
+    async function getEncryptionKeys() {
+      var privateSaved = localStorage.getItem("PM_PRIVATE_KEY");
+      var publicSaved = localStorage.getItem("PM_PUBLIC_KEY");
+      if (privateSaved && publicSaved) {
+        try {
+          var privateKey = await crypto.subtle.importKey("jwk", JSON.parse(privateSaved), { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
+          var publicKey = await crypto.subtle.importKey("jwk", JSON.parse(publicSaved), { name: "ECDH", namedCurve: "P-256" }, true, []);
+          return { privateKey: privateKey, publicKey: publicKey };
+        } catch (error) {
+          localStorage.removeItem("PM_PRIVATE_KEY");
+          localStorage.removeItem("PM_PUBLIC_KEY");
+        }
+      }
+      var generated = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
+      localStorage.setItem("PM_PRIVATE_KEY", JSON.stringify(await crypto.subtle.exportKey("jwk", generated.privateKey)));
+      localStorage.setItem("PM_PUBLIC_KEY", JSON.stringify(await crypto.subtle.exportKey("jwk", generated.publicKey)));
+      return generated;
+    }
+
+    async function createUserProfile(user, profileInput) {
+      var userRef = db.collection("users").doc(user.uid);
+      var keys = await getEncryptionKeys();
+      var publicKey = await crypto.subtle.exportKey("jwk", keys.publicKey);
+      var snapshot = await userRef.get();
+
+      if (snapshot.exists) {
+        var existing = snapshot.data();
+        var updateData = { publicKey: publicKey, online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() };
+        if (profileInput) {
+          if (profileInput.name) updateData.name = profileInput.name;
+          if (profileInput.username) updateData.username = profileInput.username;
+        }
+        await userRef.set(updateData, { merge: true });
+        existing.publicKey = publicKey;
+        if (updateData.name) existing.name = updateData.name;
+        if (updateData.username) existing.username = updateData.username;
+        return existing;
+      }
+
+      var profile = {
+        uid: user.uid,
+        email: user.email || "",
+        name: profileInput && profileInput.name ? profileInput.name : (user.displayName || "User"),
+        username: profileInput && profileInput.username ? profileInput.username : ("@" + (user.email ? user.email.split('@')[0] : "user")),
+        userId: generateUserId(),
+        publicKey: publicKey,
+        online: true,
+        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await userRef.set(profile);
+      return profile;
+    }
+
+    async function getSharedEncryptionKey() {
+      if (!selectedUser) throw new Error("Select a user.");
+      var otherSnapshot = await db.collection("users").doc(selectedUser.uid).get();
+      if (!otherSnapshot.exists) throw new Error("User not found.");
+      var otherData = otherSnapshot.data();
+      if (!otherData.publicKey) throw new Error("Peer user has not initialized keys yet.");
+
+      var keys = await getEncryptionKeys();
+      var otherPublicKey = await crypto.subtle.importKey("jwk", otherData.publicKey, { name: "ECDH", namedCurve: "P-256" }, true, []);
+      return crypto.subtle.deriveKey({ name: "ECDH", public: otherPublicKey }, keys.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    }
+
+    function uint8ToBase64(array) {
+      var binary = "";
+      for (var i = 0; i < array.length; i++) binary += String.fromCharCode(array[i]);
+      return btoa(binary);
+    }
+    function base64ToUint8(string) {
+      var binary = atob(string);
+      var result = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) result[i] = binary.charCodeAt(i);
+      return result;
+    }
+
+    async function encryptPayload(plainText) {
+      var key = await getSharedEncryptionKey();
+      var iv = crypto.getRandomValues(new Uint8Array(12));
+      var encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, new TextEncoder().encode(plainText));
+      return { iv: uint8ToBase64(iv), cipher: uint8ToBase64(new Uint8Array(encrypted)) };
+    }
+    async function decryptPayload(iv, cipher) {
+      var key = await getSharedEncryptionKey();
+      var decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToUint8(iv) }, key, base64ToUint8(cipher));
+      return new TextDecoder().decode(decrypted);
+    }
+
+    /* AUTH ROUTING */
+    $("CH_TOGGLE_AUTH").onclick = function() {
+      isSignUpMode = !isSignUpMode;
+      $("CH_AUTH_HEADING").textContent = isSignUpMode ? "Welcome to Chatly" : "Welcome Back";
+      $("CH_AUTH_SUBTITLE").textContent = isSignUpMode ? "Chat • Call • Share • Connect with End-to-End Privacy." : "Login to continue your private conversations.";
+      $("CH_INPUT_NAME").style.display = isSignUpMode ? "block" : "none";
+      $("CH_INPUT_USERNAME").style.display = isSignUpMode ? "block" : "none";
+      $("CH_SUBMIT_AUTH").textContent = isSignUpMode ? "Get Started" : "Login";
+      $("CH_TOGGLE_AUTH").textContent = isSignUpMode ? "Already have an account? Login" : "Don't have an account? Sign Up";
+      $("CH_AUTH_STATUS").textContent = "";
+    };
+
+    $("CH_SUBMIT_AUTH").onclick = async function() {
+      var email = $("CH_INPUT_EMAIL").value.trim();
+      var password = $("CH_INPUT_PASSWORD").value;
+
+      if (!isSignUpMode) {
+        if (!email || !password) {
+          $("CH_AUTH_STATUS").textContent = "Enter your email and password.";
+          return;
+        }
+        try {
+          $("CH_AUTH_STATUS").textContent = "Logging in...";
+          await auth.signInWithEmailAndPassword(email, password);
+        } catch(e) {
+          $("CH_AUTH_STATUS").textContent = e.message;
+        }
+        return;
+      }
+
+      var name = $("CH_INPUT_NAME").value.trim();
+      var username = $("CH_INPUT_USERNAME").value.trim().toLowerCase();
+      if (!name || !username || !email || password.length < 6) {
+        $("CH_AUTH_STATUS").textContent = "Please fill all fields (password min 6 chars).";
+        return;
+      }
+      if (username.charAt(0) !== "@") username = "@" + username;
+
+      var btn = $("CH_SUBMIT_AUTH");
+      try {
+        btn.disabled = true;
+        $("CH_AUTH_STATUS").textContent = "Checking username...";
+        var checkSnap = await db.collection("users").where("username", "==", username).limit(1).get();
+        if (!checkSnap.empty) {
+          $("CH_AUTH_STATUS").textContent = "Username is already taken.";
+          btn.disabled = false;
+          return;
+        }
+        $("CH_AUTH_STATUS").textContent = "Creating account...";
+        pendingProfile = { name: name, username: username };
+        var cred = await auth.createUserWithEmailAndPassword(email, password);
+        await createUserProfile(cred.user, pendingProfile);
+        pendingProfile = null;
+      } catch(err) {
+        $("CH_AUTH_STATUS").textContent = err.message;
+        btn.disabled = false;
+        pendingProfile = null;
+      }
+    };
+
+    auth.onAuthStateChanged(async function(user) {
+      if (!user) {
+        currentUser = null;
+        myProfile = null;
+        $("CH_AUTH_VIEW").classList.remove("ch-hidden");
+        $("CH_APP_SHELL").classList.add("ch-hidden");
+        return;
+      }
+      try {
+        currentUser = user;
+        myProfile = await createUserProfile(user, pendingProfile);
+
+        $("CH_SETTINGS_NAME").value = myProfile.name || "User";
+        $("CH_SETTINGS_USERNAME").value = myProfile.username || "";
+        $("CH_SETTINGS_NOTIF").checked = notificationsEnabled;
+        $("CH_SETTINGS_MSG_TONE").value = localStorage.getItem("PM_MSG_TONE") || "default";
+
+        $("CH_AUTH_VIEW").classList.add("ch-hidden");
+        $("CH_APP_SHELL").classList.remove("ch-hidden");
+
+        setUserOnlineStatus(true);
+        requestNotificationPermission();
+        loadConversations();
+        listenForIncomingCalls();
+        listenForGlobalIncomingMessages();
+        loadAllStories();
+      } catch(e) {
+        toast("Profile error: " + e.message);
+      }
+    });
+
+    function switchTab(tabName) {
+      var tabs = ["CH_TAB_CHATS", "CH_TAB_CALLS", "CH_TAB_PEOPLE", "CH_TAB_SETTINGS"];
+      tabs.forEach(function(t){ $(t).classList.remove("active"); });
+
+      $("CH_VIEW_CHATS").classList.add("ch-hidden");
+      $("CH_VIEW_CALLS").classList.add("ch-hidden");
+      $("CH_VIEW_PEOPLE").classList.add("ch-hidden");
+
+      if (tabName === "chats") {
+        $("CH_TAB_CHATS").classList.add("active");
+        $("CH_VIEW_CHATS").classList.remove("ch-hidden");
+        $("CH_SIDE_TITLE").textContent = "Chatly";
+      } else if (tabName === "calls") {
+        $("CH_TAB_CALLS").classList.add("active");
+        $("CH_VIEW_CALLS").classList.remove("ch-hidden");
+        $("CH_SIDE_TITLE").textContent = "Call History";
+      } else if (tabName === "people") {
+        $("CH_TAB_PEOPLE").classList.add("active");
+        $("CH_VIEW_PEOPLE").classList.remove("ch-hidden");
+        $("CH_SIDE_TITLE").textContent = "People";
+      } else if (tabName === "settings") {
+        $("CH_TAB_SETTINGS").classList.add("active");
+        $("CH_SETTINGS_MODAL").classList.remove("ch-hidden");
+      }
+    }
+
+    $("CH_TAB_CHATS").onclick = function() { switchTab("chats"); };
+    $("CH_TAB_CALLS").onclick = function() { switchTab("calls"); };
+    $("CH_TAB_PEOPLE").onclick = function() { switchTab("people"); };
+    $("CH_TAB_SETTINGS").onclick = function() { switchTab("settings"); };
+
+    /* ----------------------------------------------------
+       STORIES / STATUS SYSTEM (LARGE SIZE CLOUD STORAGE)
+    ---------------------------------------------------- */
+    $("CH_MY_STORY_TRIGGER").onclick = function() { $("CH_STORY_INPUT").click(); };
+
+    $("CH_STORY_INPUT").onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      var pBox = $("PM_PROGRESS_BOX");
+      var pFill = $("PM_PROGRESS_FILL");
+      var pPerc = $("PM_PROGRESS_PERCENT");
+      var pText = $("PM_PROGRESS_TEXT");
+
+      pBox.classList.remove("ch-hidden");
+      pText.textContent = "Uploading Story: " + file.name;
+      pFill.style.width = "0%";
+      pPerc.textContent = "0%";
+
+      var storyId = Date.now() + "_" + file.name;
+      var sRef = storage.ref().child("stories/" + currentUser.uid + "/" + storyId);
+      var uploadTask = sRef.put(file);
+
+      uploadTask.on("state_changed", function(snap) {
+        var p = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        pFill.style.width = p + "%";
+        pPerc.textContent = p + "%";
+      }, function(err) {
+        pBox.classList.add("ch-hidden");
+        toast("Story upload error: " + err.message);
+        $("CH_STORY_INPUT").value = "";
+      }, async function() {
+        try {
+          var downloadUrl = await uploadTask.snapshot.ref.getDownloadURL();
+          await db.collection("users").doc(currentUser.uid).update({
+            storyUrl: downloadUrl,
+            storyType: file.type.startsWith("video") ? "video" : "image",
+            storyAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          toast("Story posted successfully!");
+          loadAllStories();
+        } catch(err) {
+          toast("Error updating story profile: " + err.message);
+        } finally {
+          pBox.classList.add("ch-hidden");
+          $("CH_STORY_INPUT").value = "";
+        }
+      });
+    };
+
+    function showStory(mediaUrl, mediaType) {
+      var viewer = $("CH_STORY_VIEWER");
+      var content = $("CH_STORY_CONTENT");
+      if (mediaType === "video") {
+        content.innerHTML = "<video src='" + mediaUrl + "' autoplay controls playsinline style='max-width:100%; max-height:80vh;'></video>";
+      } else {
+        content.innerHTML = "<img src='" + mediaUrl + "' style='max-width:100%; max-height:80vh; object-fit:contain;'/>";
+      }
+      viewer.classList.remove("ch-hidden");
+    }
+
+    async function loadAllStories() {
+      if (!currentUser) return;
+      var container = $("CH_STORIES_CONTAINER");
+      var myRing = $("CH_MY_STORY_RING");
+
+      var mySnap = await db.collection("users").doc(currentUser.uid).get();
+      if (mySnap.exists && mySnap.data().storyUrl) {
+        myRing.classList.add("has-story");
+        $("CH_MY_STORY_TRIGGER").onclick = function() {
+          if (confirm("Click OK to VIEW your story, or CANCEL to UPLOAD a new one.")) {
+            showStory(mySnap.data().storyUrl, mySnap.data().storyType);
+          } else {
+            $("CH_STORY_INPUT").click();
+          }
+        };
+      } else {
+        myRing.classList.remove("has-story");
+        $("CH_MY_STORY_TRIGGER").onclick = function() { $("CH_STORY_INPUT").click(); };
+      }
+
+      var peers = container.querySelectorAll(".peer-story-item");
+      peers.forEach(function(el){ el.remove(); });
+
+      var contactsSnap = await db.collection("users").doc(currentUser.uid).collection("contacts").get();
+      contactsSnap.forEach(async function(cDoc) {
+        var uDoc = await db.collection("users").doc(cDoc.id).get();
+        if (!uDoc.exists) return;
+        var uData = uDoc.data();
+        if (uData.storyUrl) {
+          var item = document.createElement("div");
+          item.className = "ch-story-item peer-story-item";
+          item.innerHTML = 
+            "<div class='ch-story-ring has-story'>" +
+              "<div class='ch-story-avatar'>" + escapeHTML((uData.name || "U").charAt(0).toUpperCase()) + "</div>" +
+            "</div>" +
+            "<span class='ch-story-name'>" + escapeHTML(uData.name || "Friend") + "</span>";
+          item.onclick = function() {
+            showStory(uData.storyUrl, uData.storyType);
+          };
+          container.appendChild(item);
+        }
+      });
+    }
+
+    $("CH_CLOSE_STORY").onclick = function() {
+      $("CH_STORY_VIEWER").classList.add("ch-hidden");
+      $("CH_STORY_CONTENT").innerHTML = "";
+    };
+
+    $("CH_PROFILE_TRIGGER").onclick = function() { $("CH_SETTINGS_MODAL").classList.remove("ch-hidden"); };
+    $("CH_CLOSE_SETTINGS_BTN").onclick = function() {
+      $("CH_SETTINGS_MODAL").classList.add("ch-hidden");
+      switchTab("chats");
+    };
+
+    $("CH_SAVE_SETTINGS_BTN").onclick = async function() {
+      var newName = $("CH_SETTINGS_NAME").value.trim();
+      notificationsEnabled = $("CH_SETTINGS_NOTIF").checked;
+      localStorage.setItem("PM_NOTIF_PREF", notificationsEnabled ? "true" : "false");
+      
+      var selectedTone = $("CH_SETTINGS_MSG_TONE").value;
+      localStorage.setItem("PM_MSG_TONE", selectedTone);
+
+      if (newName && currentUser) {
+        try {
+          await db.collection("users").doc(currentUser.uid).update({ name: newName });
+          myProfile.name = newName;
+        } catch(e) {}
+      }
+      $("CH_SETTINGS_MODAL").classList.add("ch-hidden");
+      switchTab("chats");
+      toast("Settings updated successfully.");
+    };
+
+    $("CH_LOGOUT_BTN").onclick = function() {
+      setUserOnlineStatus(false);
+      stopCallRingtone();
+      $("CH_SETTINGS_MODAL").classList.add("ch-hidden");
+      auth.signOut();
+    };
+
+    async function promptAddContact() {
+      var username = prompt("Enter Chatly @username:");
+      if (!username) return;
+      username = username.trim().toLowerCase();
+      if (username.charAt(0) !== "@") username = "@" + username;
+
+      if (myProfile && myProfile.username === username) {
+        toast("Cannot add yourself.");
+        return;
+      }
+
+      try {
+        var snap = await db.collection("users").where("username", "==", username).limit(1).get();
+        if (snap.empty) {
+          toast("User not found.");
+          return;
+        }
+        var targetUser = snap.docs[0].data();
+
+        await db.collection("users").doc(currentUser.uid).collection("contacts").doc(targetUser.uid).set({
+          uid: targetUser.uid,
+          name: targetUser.name || "User",
+          username: targetUser.username || "",
+          addedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await db.collection("users").doc(targetUser.uid).collection("contacts").doc(currentUser.uid).set({
+          uid: currentUser.uid,
+          name: myProfile.name || "User",
+          username: myProfile.username || "",
+          addedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        openConversation(targetUser);
+        switchTab("chats");
+        loadAllStories();
+      } catch(e) {
+        toast(e.message);
+      }
+    }
+
+    $("CH_ADD_CONTACT_BTN").onclick = promptAddContact;
+    $("CH_ADD_PEOPLE_TRIGGER").onclick = promptAddContact;
+
+    function loadConversations() {
+      if (contactUnsubscribe) contactUnsubscribe();
+      contactUnsubscribe = db.collection("users").doc(currentUser.uid).collection("contacts").onSnapshot(async function(snapshot) {
+        var listContainer = $("CH_CONVERSATIONS_LIST");
+        var peopleContainer = $("CH_PEOPLE_LIST");
+        listContainer.innerHTML = "";
+        peopleContainer.innerHTML = "";
+
+        for (var i = 0; i < snapshot.docs.length; i++) {
+          var cData = snapshot.docs[i].data();
+          var uDoc = await db.collection("users").doc(cData.uid).get();
+          if (!uDoc.exists) continue;
+          var user = uDoc.data();
+
+          var isUserOnline = user.online === true;
+          var statusText = isUserOnline ? "Online" : formatLastSeen(user);
+
+          var item = document.createElement("div");
+          item.className = "ch-chat-item " + (selectedUser && selectedUser.uid === user.uid ? "active" : "");
+          item.innerHTML =
+            "<div class='ch-avatar'>" + 
+              escapeHTML((user.name || "U").charAt(0).toUpperCase()) + 
+              "<span class='ch-avatar-dot " + (isUserOnline ? "online" : "") + "'></span>" +
+            "</div>" +
+            "<div class='ch-chat-info'>" +
+              "<div class='ch-chat-top'>" +
+                "<span class='ch-chat-name'>" + escapeHTML(user.name || "User") + "</span>" +
+                "<span class='ch-chat-time " + (isUserOnline ? "online-badge" : "") + "'>" + escapeHTML(statusText) + "</span>" +
+              "</div>" +
+              "<div class='ch-chat-bottom'>" +
+                "<span class='ch-chat-lastmsg'>" + escapeHTML(user.username || "") + "</span>" +
+              "</div>" +
+            "</div>";
+
+          item.onclick = (function(target){
+            return function() { openConversation(target); };
+          })(user);
+          listContainer.appendChild(item);
+
+          var pItem = document.createElement("div");
+          pItem.className = "ch-chat-item";
+          pItem.innerHTML =
+            "<div class='ch-avatar' style='background:#1e293b; color:#fff;'>" + 
+              escapeHTML((user.name || "U").charAt(0).toUpperCase()) + 
+              "<span class='ch-avatar-dot " + (isUserOnline ? "online" : "") + "'></span>" +
+            "</div>" +
+            "<div class='ch-chat-info'>" +
+              "<div class='ch-chat-name'>" + escapeHTML(user.name || "User") + "</div>" +
+              "<div style='font-size:12px; color:var(--text-muted);'>" + escapeHTML(user.username || "") + " • " + escapeHTML(statusText) + "</div>" +
+            "</div>";
+
+          pItem.onclick = (function(target){
+            return function() { openConversation(target); switchTab("chats"); };
+          })(user);
+          peopleContainer.appendChild(pItem);
+        }
+      });
+    }
+
+    function openConversation(user) {
+      selectedUser = user;
+      $("CH_APP_SHELL").classList.add("chat-open");
+      $("CH_ACTIVE_NAME").textContent = user.name || "User";
+      $("CH_ACTIVE_AVATAR").textContent = (user.name || "U").charAt(0).toUpperCase();
+
+      if (peerPresenceUnsubscribe) peerPresenceUnsubscribe();
+      peerPresenceUnsubscribe = db.collection("users").doc(user.uid).onSnapshot(function(docSnap) {
+        if (!docSnap.exists) return;
+        var uData = docSnap.data();
+        var isOnline = uData.online === true;
+        var statusLabel = $("CH_STATUS_LABEL");
+        var dot = $("CH_ACTIVE_STATUS").querySelector(".ch-status-dot");
+
+        if (isOnline) {
+          statusLabel.textContent = "Online";
+          $("CH_ACTIVE_STATUS").classList.add("online");
+          if (dot) dot.classList.add("online");
+        } else {
+          statusLabel.textContent = formatLastSeen(uData);
+          $("CH_ACTIVE_STATUS").classList.remove("online");
+          if (dot) dot.classList.remove("online");
+        }
+      });
+
+      $("CH_ATTACHMENT_MENU").classList.add("ch-hidden");
+      loadMessages();
+    }
+
+    $("CH_CHAT_BACK").onclick = function() {
+      $("CH_APP_SHELL").classList.remove("chat-open");
+      selectedUser = null;
+      if (messageUnsubscribe) messageUnsubscribe();
+      if (peerPresenceUnsubscribe) peerPresenceUnsubscribe();
+    };
+
+    function listenForGlobalIncomingMessages() {
+      if (globalMsgUnsubscribe) globalMsgUnsubscribe();
+      globalMsgUnsubscribe = db.collectionGroup("messages")
+        .where("seen", "==", false)
+        .onSnapshot(function(snapshot) {
+          snapshot.docChanges().forEach(function(change) {
+            if (change.type === "added") {
+              var msg = change.doc.data();
+              if (msg.from !== currentUser.uid) {
+                playMessageRingtone();
+                if (!selectedUser || selectedUser.uid !== msg.from || document.visibilityState !== "visible") {
+                  showPushNotification("Chatly", "You have a new encrypted message.", "msg-" + change.doc.id, false);
+                }
+              }
+            }
+          });
+        });
+    }
+
+    async function markMessagesAsSeen(roomId, unreadDocs) {
+      if (!unreadDocs || unreadDocs.length === 0) return;
+      var batch = db.batch();
+      unreadDocs.forEach(function(doc) {
+        batch.update(doc.ref, { seen: true, seenAt: firebase.firestore.FieldValue.serverTimestamp() });
+      });
+      try { await batch.commit(); } catch(e) {}
+    }
+
+    function loadMessages() {
+      if (messageUnsubscribe) messageUnsubscribe();
+      if (!selectedUser) return;
+
+      var roomId = chatRoomId(currentUser.uid, selectedUser.uid);
+      var container = $("CH_MESSAGES_FEED");
+      container.innerHTML = "";
+
+      messageUnsubscribe = db.collection("chats").doc(roomId).collection("messages")
+        .orderBy("createdAt", "asc")
+        .onSnapshot(async function(snapshot) {
+          var unreadDocsToMark = [];
+
+          snapshot.docChanges().forEach(async function(change) {
+            var doc = change.doc;
+            var messageId = doc.id;
+            var message = doc.data();
+            var existing = container.querySelector('[data-id="' + messageId + '"]');
+
+            if (message.from !== currentUser.uid && !message.seen) {
+              unreadDocsToMark.push(doc);
+            }
+
+            if (change.type === "removed" && existing) {
+              existing.remove();
+              return;
+            }
+
+            var timeText = "";
+            if (message.createdAt && message.createdAt.toDate) {
+              timeText = message.createdAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            } else if (message.localTime) {
+              timeText = message.localTime;
+            } else {
+              timeText = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            }
+
+            var decrypted = "[Encrypted Content]";
+            try {
+              decrypted = await decryptPayload(message.iv, message.cipher);
+            } catch(e) {
+              decrypted = "[Decryption Error]";
+            }
+
+            var payload = null;
+            try {
+              if (decrypted.startsWith("{\"type\":")) payload = JSON.parse(decrypted);
+            } catch(e) {}
+
+            var html = "";
+            if (payload && payload.type === "voice") {
+              html += "<div class='ch-audio-player'><audio controls src='" + payload.url + "' preload='metadata'></audio></div>";
+            } else if (payload && payload.type === "file") {
+              if (payload.mime && payload.mime.startsWith("image/")) {
+                html += "<img class='ch-img-preview' src='" + payload.url + "' alt='Image' loading='lazy'/>";
+              }
+              html += "<div class='ch-file-badge'>" +
+                "<div>📁</div>" +
+                "<div style='flex:1; min-width:0;'>" +
+                  "<div class='name'>" + escapeHTML(payload.name) + "</div>" +
+                  "<div class='size'>" + formatBytes(payload.size) + "</div>" +
+                "</div>" +
+                "<a class='dl-btn' href='" + payload.url + "' target='_blank' rel='noopener noreferrer' download>Get</a>" +
+              "</div>";
+            } else {
+              html = escapeHTML(decrypted);
+            }
+
+            var isMine = message.from === currentUser.uid;
+            var isSeen = !!message.seen;
+            var tickHtml = isMine ? "<span class='ch-tick " + (isSeen ? "seen" : "") + "'>" + (isSeen ? "✓✓" : "✓") + "</span>" : "";
+
+            if (change.type === "modified" && existing) {
+              var bubbleEl = existing.querySelector(".ch-bubble");
+              if (bubbleEl) {
+                bubbleEl.innerHTML = html +
+                  "<div class='ch-bubble-meta'>" +
+                    "<span class='ch-bubble-time'>" + timeText + "</span>" +
+                    tickHtml +
+                  "</div>";
+              }
+              return;
+            }
+
+            if (change.type === "added" && !existing) {
+              var wrapper = document.createElement("div");
+              wrapper.className = "ch-msg-wrapper " + (isMine ? "mine" : "");
+              wrapper.setAttribute("data-id", messageId);
+
+              var bubble = document.createElement("div");
+              bubble.className = "ch-bubble";
+              bubble.innerHTML = html +
+                "<div class='ch-bubble-meta'>" +
+                  "<span class='ch-bubble-time'>" + timeText + "</span>" +
+                  tickHtml +
+                "</div>";
+
+              wrapper.appendChild(bubble);
+
+              if (isMine) {
+                var del = document.createElement("button");
+                del.className = "ch-msg-del-btn";
+                del.title = "Delete";
+                del.innerHTML = "✕";
+                del.onclick = function() {
+                  if (confirm("Delete this message?")) {
+                    db.collection("chats").doc(roomId).collection("messages").doc(messageId).delete();
+                  }
+                };
+                wrapper.appendChild(del);
+              }
+
+              container.appendChild(wrapper);
+              container.scrollTop = container.scrollHeight;
+            }
+          });
+
+          if (unreadDocsToMark.length > 0) {
+            markMessagesAsSeen(roomId, unreadDocsToMark);
+          }
+        });
+    }
+
+    async function sendMessage() {
+      if (isRecording) {
+        stopRecordingAndSend();
+        return;
+      }
+      if (isSending || !selectedUser) return;
+
+      var text = messageBox.value.trim();
+      if (!text) return;
+
+      isSending = true;
+      messageBox.value = "";
+      resetTextareaHeight();
+
+      var localTimeString = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      try {
+        var encrypted = await encryptPayload(text);
+        var roomId = chatRoomId(currentUser.uid, selectedUser.uid);
+        await db.collection("chats").doc(roomId).collection("messages").add({
+          from: currentUser.uid,
+          iv: encrypted.iv,
+          cipher: encrypted.cipher,
+          seen: false,
+          localTime: localTimeString,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch(e) {
+        toast("Send failed: " + e.message);
+        messageBox.value = text;
+        adjustTextareaHeight();
+      } finally {
+        setTimeout(function(){ isSending = false; }, 120);
+      }
+    }
+
+    /* VOICE RECORDER */
+    $("PM_MIC_BTN").onclick = async function() {
+      if (!selectedUser) {
+        toast("Select a chat first.");
+        return;
+      }
+      if (isRecording) {
+        stopRecordingAndSend();
+        return;
+      }
+
+      try {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        cancelRecording = false;
+
+        mediaRecorder = new MediaRecorder(audioStream);
+        mediaRecorder.ondataavailable = function(e) {
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+
+        $("PM_MESSAGE").classList.add("ch-hidden");
+        $("CH_ATTACH_TRIGGER").classList.add("ch-hidden");
+        $("PM_REC_BAR").classList.remove("ch-hidden");
+        $("PM_MIC_BTN").classList.add("recording");
+
+        recSeconds = 0;
+        $("PM_REC_TIMER").textContent = "00:00";
+        recTimerInterval = setInterval(function(){
+          recSeconds++;
+          var mins = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+          var secs = String(recSeconds % 60).padStart(2, '0');
+          $("PM_REC_TIMER").textContent = mins + ":" + secs;
+        }, 1000);
+      } catch(e) {
+        toast("Microphone error: " + e.message);
+      }
+    };
+
+    function stopRecordingAndSend() {
+      if (!isRecording || !mediaRecorder) return;
+      isRecording = false;
+      cancelRecording = false;
+      clearInterval(recTimerInterval);
+
+      $("PM_REC_BAR").classList.add("ch-hidden");
+      $("PM_MESSAGE").classList.remove("ch-hidden");
+      $("CH_ATTACH_TRIGGER").classList.remove("ch-hidden");
+      $("PM_MIC_BTN").classList.remove("recording");
+
+      mediaRecorder.onstop = function() {
+        if (audioStream) audioStream.getTracks().forEach(function(t){ t.stop(); });
+        if (cancelRecording || audioChunks.length === 0) return;
+
+        var audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+        audioChunks = [];
+
+        var fileId = Date.now() + "_voice.webm";
+        var roomId = chatRoomId(currentUser.uid, selectedUser.uid);
+        var sRef = storage.ref().child("attachments/" + roomId + "/" + fileId);
+        
+        sRef.put(audioBlob).then(async function(taskSnap) {
+          var url = await taskSnap.ref.getDownloadURL();
+          var payload = JSON.stringify({ type: "voice", url: url, duration: recSeconds });
+          var encrypted = await encryptPayload(payload);
+          var localTimeString = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+          await db.collection("chats").doc(roomId).collection("messages").add({
+            from: currentUser.uid,
+            iv: encrypted.iv,
+            cipher: encrypted.cipher,
+            seen: false,
+            localTime: localTimeString,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }).catch(function(err) {
+          toast("Voice note upload failed: " + err.message);
+        });
+      };
+
+      try {
+        if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      } catch(e) {}
+    }
+
+    $("PM_CANCEL_REC").onclick = function() {
+      if (!isRecording) return;
+      isRecording = false;
+      cancelRecording = true;
+      clearInterval(recTimerInterval);
+
+      $("PM_REC_BAR").classList.add("ch-hidden");
+      $("PM_MESSAGE").classList.remove("ch-hidden");
+      $("CH_ATTACH_TRIGGER").classList.remove("ch-hidden");
+      $("PM_MIC_BTN").classList.remove("recording");
+
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      if (audioStream) audioStream.getTracks().forEach(function(t){ t.stop(); });
+      audioChunks = [];
+      toast("Recording discarded.");
+    };
+
+    $("CH_ATTACH_TRIGGER").onclick = function() {
+      if (!selectedUser) {
+        toast("Select a chat first.");
+        return;
+      }
+      $("CH_ATTACHMENT_MENU").classList.toggle("ch-hidden");
+    };
+
+    $("CH_ACTION_DOC").onclick = function() { $("PM_FILE_INPUT").click(); $("CH_ATTACHMENT_MENU").classList.add("ch-hidden"); };
+    $("CH_ACTION_GALLERY").onclick = function() { $("PM_FILE_INPUT").click(); $("CH_ATTACHMENT_MENU").classList.add("ch-hidden"); };
+    $("CH_ACTION_AUDIO").onclick = function() { $("PM_FILE_INPUT").click(); $("CH_ATTACHMENT_MENU").classList.add("ch-hidden"); };
+    $("CH_ACTION_LOCATION").onclick = function() {
+      $("CH_ATTACHMENT_MENU").classList.add("ch-hidden");
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          messageBox.value = "📍 Live Location: https://maps.google.com/?q=" + pos.coords.latitude + "," + pos.coords.longitude;
+          sendMessage();
+        }, function(){ toast("Location denied."); });
+      }
+    };
+
+    $("CH_ACTION_CONTACT").onclick = function() {
+      $("CH_ATTACHMENT_MENU").classList.add("ch-hidden");
+      messageBox.value = "👤 Contact: " + (myProfile.name || "User") + " (" + (myProfile.username || "") + ")";
+      adjustTextareaHeight();
+    };
+
+    /* ----------------------------------------------------
+       ATTACHMENT SYSTEM (STORAGE DRIVEN FOR MAX SIZES)
+    ---------------------------------------------------- */
+    $("PM_FILE_INPUT").onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      var roomId = chatRoomId(currentUser.uid, selectedUser.uid);
+      var pBox = $("PM_PROGRESS_BOX");
+      var pFill = $("PM_PROGRESS_FILL");
+      var pPerc = $("PM_PROGRESS_PERCENT");
+      var pText = $("PM_PROGRESS_TEXT");
+
+      pBox.classList.remove("ch-hidden");
+      pText.textContent = "Uploading: " + file.name;
+      pFill.style.width = "0%";
+      pPerc.textContent = "0%";
+
+      var fileId = Date.now() + "_" + file.name;
+      var sRef = storage.ref().child("attachments/" + roomId + "/" + fileId);
+      var task = sRef.put(file);
+
+      task.on("state_changed", function(snap) {
+        var p = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        pFill.style.width = p + "%";
+        pPerc.textContent = p + "%";
+      }, function(err) {
+        pBox.classList.add("ch-hidden");
+        toast("Upload error: " + err.message);
+        $("PM_FILE_INPUT").value = "";
+      }, async function() {
+        try {
+          var url = await task.snapshot.ref.getDownloadURL();
+          var payload = JSON.stringify({ type: "file", name: file.name, size: file.size, mime: file.type || "application/octet-stream", url: url });
+          var encrypted = await encryptPayload(payload);
+          var localTimeString = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+          await db.collection("chats").doc(roomId).collection("messages").add({
+            from: currentUser.uid,
+            iv: encrypted.iv,
+            cipher: encrypted.cipher,
+            seen: false,
+            localTime: localTimeString,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        } catch(err) {
+          toast(err.message);
+        } finally {
+          pBox.classList.add("ch-hidden");
+          $("PM_FILE_INPUT").value = "";
+        }
+      });
+    };
+
+    $("PM_SEND").onclick = function(e) { e.preventDefault(); sendMessage(); };
+    messageBox.onkeydown = function(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+
+    /* ----------------------------------------------------
+       WEBRTC CALLS & FRONT/BACK CAMERA FLIP SYSTEM
+    ---------------------------------------------------- */
+    function createPeerConnection() {
+      var config = {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun.cloudflare.com:3478" }
+        ],
+        iceCandidatePoolSize: 10
+      };
+
+      var pc = new RTCPeerConnection(config);
+      pc.ontrack = function(e) {
+        if (e.streams && e.streams[0]) {
+          $("PM_REMOTE_VIDEO").srcObject = e.streams[0];
+          $("PM_REMOTE_VIDEO").play().catch(function(){});
+        }
+      };
+      pc.onconnectionstatechange = function() {
+        var s = pc.connectionState;
+        if (s === "connected") {
+          $("PM_CALL_STATUS").textContent = "Connected";
+          stopCallRingtone();
+        } else if (s === "connecting") {
+          $("PM_CALL_STATUS").textContent = "Connecting...";
+        } else if (s === "failed") { 
+          $("PM_CALL_STATUS").textContent = "Connection failed. Retrying...";
+          try { pc.restartIce(); } catch(e) {} 
+        } else if (s === "disconnected") {
+          endCall(false);
+        }
+      };
+      return pc;
+    }
+
+    async function getMediaStream(video, facing) {
+      facing = facing || "user";
+      if (!video) {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+    }
+
+    async function flipCamera() {
+      if (!callIsVideo || !localStream) {
+        toast("Camera flip only works in video calls.");
+        return;
+      }
+
+      var newMode = currentFacingMode === "user" ? "environment" : "user";
+      try {
+        var newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: newMode } }
+        }).catch(async function() {
+          return await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: newMode } }
+          });
+        });
+
+        var newVideoTrack = newStream.getVideoTracks()[0];
+        var oldVideoTrack = localStream.getVideoTracks()[0];
+
+        if (peerConnection) {
+          var sender = peerConnection.getSenders().find(function(s) {
+            return s.track && s.track.kind === "video";
+          });
+          if (sender) {
+            sender.replaceTrack(newVideoTrack);
+          }
+        }
+
+        localStream.removeTrack(oldVideoTrack);
+        oldVideoTrack.stop();
+        localStream.addTrack(newVideoTrack);
+
+        var pip = $("PM_LOCAL_VIDEO");
+        pip.srcObject = localStream;
+
+        currentFacingMode = newMode;
+        if (currentFacingMode === "environment") {
+          pip.classList.add("environment-mode");
+        } else {
+          pip.classList.remove("environment-mode");
+        }
+
+        toast(currentFacingMode === "environment" ? "Back camera active" : "Front camera active");
+      } catch(err) {
+        toast("Unable to flip camera: " + err.message);
+      }
+    }
+
+    $("PM_FLIP_CAMERA").onclick = flipCamera;
+
+    async function drainCandidates() {
+      while (candidateQueue.length > 0) {
+        var c = candidateQueue.shift();
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
+      }
+    }
+
+    async function startCall(video) {
+      if (!selectedUser) {
+        toast("Select a contact to call.");
+        return;
+      }
+      try {
+        callIsVideo = video;
+        currentFacingMode = "user";
+        candidateQueue = [];
+        isAudioMuted = false;
+        isVideoMuted = false;
+        $("PM_MUTE").classList.remove("disabled-btn");
+        $("PM_MUTE").innerHTML = "🎙️";
+        $("PM_CAMERA").classList.remove("disabled-btn");
+        $("PM_CAMERA").innerHTML = "📷";
+
+        $("PM_CALL").classList.remove("ch-hidden");
+        $("PM_CALL_TITLE").textContent = (video ? "Video" : "Voice") + " Call with " + (selectedUser.name || "User");
+        $("PM_CALL_STATUS").textContent = "Calling...";
+
+        localStream = await getMediaStream(video, currentFacingMode);
+        var pip = $("PM_LOCAL_VIDEO");
+        pip.srcObject = localStream;
+        pip.style.display = video ? "block" : "none";
+        pip.classList.remove("environment-mode");
+
+        if (window.resetSelfView) window.resetSelfView();
+
+        peerConnection = createPeerConnection();
+        localStream.getTracks().forEach(function(t){ peerConnection.addTrack(t, localStream); });
+
+        currentCallId = crypto.randomUUID();
+
+        peerConnection.onicecandidate = async function(e) {
+          if (e.candidate) {
+            await db.collection("calls").doc(currentCallId).collection("callerCandidates").add(e.candidate.toJSON());
+          }
+        };
+
+        var offer = await peerConnection.createOffer({ offerToReceiveAudio: 1, offerToReceiveVideo: video ? 1 : 0 });
+        await peerConnection.setLocalDescription(offer);
+
+        await db.collection("calls").doc(currentCallId).set({
+          caller: currentUser.uid,
+          callerName: myProfile ? myProfile.name : "Chatly Contact",
+          callee: selectedUser.uid,
+          video: video,
+          offer: { type: offer.type, sdp: offer.sdp },
+          status: "ringing",
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        db.collection("calls").doc(currentCallId).onSnapshot(async function(snap) {
+          var d = snap.data();
+          if (d && d.answer && !peerConnection.currentRemoteDescription) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(d.answer));
+            await drainCandidates();
+          }
+          if (d && d.status === "ended") endCall(false);
+          if (d && d.status === "declined") { toast("Call was declined."); endCall(false); }
+        });
+
+        db.collection("calls").doc(currentCallId).collection("calleeCandidates").onSnapshot(function(snap) {
+          snap.docChanges().forEach(async function(c) {
+            if (c.type === "added") {
+              var cand = c.doc.data();
+              if (peerConnection && peerConnection.remoteDescription) {
+                try { await peerConnection.addIceCandidate(new RTCIceCandidate(cand)); } catch(e) {}
+              } else {
+                candidateQueue.push(cand);
+              }
+            }
+          });
+        });
+      } catch(err) {
+        toast("Call setup error: " + err.message);
+        endCall(false);
+      }
+    }
+
+    function listenForIncomingCalls() {
+      if (incomingCallUnsubscribe) incomingCallUnsubscribe();
+      incomingCallUnsubscribe = db.collection("calls")
+        .where("callee", "==", currentUser.uid)
+        .where("status", "==", "ringing")
+        .onSnapshot(function(snap) {
+          snap.docChanges().forEach(function(c) {
+            if (c.type !== "added") return;
+            var call = c.doc.data();
+
+            callRingtone.currentTime = 0;
+            callRingtone.play().catch(function(){});
+
+            var callerLabel = call.callerName || "Someone";
+            var callType = call.video ? "Video" : "Voice";
+            showPushNotification(callType + " Call Incoming", callerLabel + " is calling you on Chatly...", "call-" + c.doc.id, true);
+
+            var accept = confirm(callerLabel + " se " + callType + " call aa rahi hai. Accept karein?");
+            stopCallRingtone();
+
+            if (accept) {
+              acceptCall(c.doc.id, call);
+            } else {
+              db.collection("calls").doc(c.doc.id).update({ status: "declined" });
+            }
+          });
+        });
+    }
+
+    async function acceptCall(callId, call) {
+      try {
+        stopCallRingtone();
+        currentCallId = callId;
+        callIsVideo = !!call.video;
+        currentFacingMode = "user";
+        candidateQueue = [];
+        isAudioMuted = false;
+        isVideoMuted = false;
+        $("PM_MUTE").classList.remove("disabled-btn");
+        $("PM_MUTE").innerHTML = "🎙️";
+        $("PM_CAMERA").classList.remove("disabled-btn");
+        $("PM_CAMERA").innerHTML = "📷";
+
+        $("PM_CALL").classList.remove("ch-hidden");
+        $("PM_CALL_TITLE").textContent = (call.video ? "Video" : "Voice") + " Call";
+        $("PM_CALL_STATUS").textContent = "Connecting...";
+
+        localStream = await getMediaStream(call.video, currentFacingMode);
+        var pip = $("PM_LOCAL_VIDEO");
+        pip.srcObject = localStream;
+        pip.style.display = call.video ? "block" : "none";
+        pip.classList.remove("environment-mode");
+
+        if (window.resetSelfView) window.resetSelfView();
+
+        peerConnection = createPeerConnection();
+        localStream.getTracks().forEach(function(t){ peerConnection.addTrack(t, localStream); });
+
+        peerConnection.onicecandidate = async function(e) {
+          if (e.candidate) {
+            await db.collection("calls").doc(callId).collection("calleeCandidates").add(e.candidate.toJSON());
+          }
+        };
+
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
+        var answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        await db.collection("calls").doc(callId).update({
+          answer: { type: answer.type, sdp: answer.sdp },
+          status: "accepted"
+        });
+
+        await drainCandidates();
+
+        db.collection("calls").doc(callId).collection("callerCandidates").onSnapshot(function(snap) {
+          snap.docChanges().forEach(async function(c) {
+            if (c.type === "added") {
+              var cand = c.doc.data();
+              if (peerConnection && peerConnection.remoteDescription) {
+                try { await peerConnection.addIceCandidate(new RTCIceCandidate(cand)); } catch(e) {}
+              } else {
+                candidateQueue.push(cand);
+              }
+            }
+          });
+        });
+      } catch(err) {
+        toast("Call answer error: " + err.message);
+        endCall(false);
+      }
+    }
+
+    $("CH_CALL_VOICE").onclick = function() { startCall(false); };
+    $("CH_CALL_VIDEO").onclick = function() { startCall(true); };
+
+    async function endCall(updateFirebase) {
+      stopCallRingtone();
+      if (updateFirebase && currentCallId) {
+        try { await db.collection("calls").doc(currentCallId).update({ status: "ended" }); } catch(e) {}
+      }
+      if (localStream) localStream.getTracks().forEach(function(t){ t.stop(); });
+      if (peerConnection) peerConnection.close();
+      localStream = null;
+      peerConnection = null;
+      currentCallId = null;
+      candidateQueue = [];
+      $("PM_REMOTE_VIDEO").srcObject = null;
+      $("PM_LOCAL_VIDEO").srcObject = null;
+      $("PM_CALL").classList.add("ch-hidden");
+      if (window.resetSelfView) window.resetSelfView();
+    }
+
+    $("PM_END_CALL").onclick = function() { endCall(true); };
+
+    $("PM_MUTE").onclick = function() {
+      if (!localStream) return;
+      var a = localStream.getAudioTracks()[0];
+      if (a) {
+        isAudioMuted = !isAudioMuted;
+        a.enabled = !isAudioMuted;
+        $("PM_MUTE").classList.toggle("disabled-btn", isAudioMuted);
+        $("PM_MUTE").innerHTML = isAudioMuted ? "🔇" : "🎙️️";
+        toast(isAudioMuted ? "Microphone muted" : "Microphone unmuted");
+      }
+    };
+
+    $("PM_CAMERA").onclick = function() {
+      if (!localStream) return;
+      var v = localStream.getVideoTracks()[0];
+      if (v) {
+        isVideoMuted = !isVideoMuted;
+        v.enabled = !isVideoMuted;
+        $("PM_CAMERA").classList.toggle("disabled-btn", isVideoMuted);
+        $("PM_CAMERA").innerHTML = isVideoMuted ? "🚫" : "📷";
+        toast(isVideoMuted ? "Camera turned off" : "Camera turned on");
+      } else {
+        toast("No video track available in this call.");
+      }
+    };
+
+  })();
+  </script>
+</body>
+</html>
